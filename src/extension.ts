@@ -64,8 +64,18 @@ function semanticBlock(state: any, startLine: number, endLine: number, silent: b
 
     // 5. Token Generation
     const tokenOpen = state.push('div_open', 'div', 1);
-    tokenOpen.attrs = [['class', 'semantic-block'], ['data-tag', tagName]];
+    tokenOpen.attrs = [['class', 'semantic-block']];
     tokenOpen.map = [startLine, nextLine + 1];
+
+    // 5.1. Title Header Generation (Real DOM element instead of pseudo-element)
+    const tokenHeaderOpen = state.push('div_open', 'div', 1);
+    tokenHeaderOpen.attrs = [['class', 'semantic-header']];
+
+    const tokenInline = state.push('inline', '', 0);
+    tokenInline.content = tagName;
+    tokenInline.children = [];
+
+    const tokenHeaderClose = state.push('div_close', 'div', -1);
 
     // Recursive parsing
     state.md.block.tokenize(state, startLine + 1, nextLine);

@@ -4,12 +4,11 @@
     background-color: var(--vscode-editor-background);
     margin: 1em 0;
     position: relative;
-    overflow: hidden;
+    /* Removed overflow: hidden to prevent layout clipping issues on hover */
 }
 
-/* Dynamic Title Bar */
-.semantic-block::before {
-    content: attr(data-tag);
+/* Dynamic Title Bar (Real DOM Element) */
+.semantic-header {
     display: block;
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-editor-foreground);
@@ -19,11 +18,13 @@
     font-size: 0.85em;
     text-transform: uppercase;
     border-bottom: 1px solid var(--vscode-panel-border);
-    /* Removed opacity to prevent "collapse" or fading issues on hover */
+    /* Manually match parent border radius */
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
 }
 
-/* Content Padding */
-.semantic-block > * {
+/* Content Padding: apply to siblings of header */
+.semantic-block > *:not(.semantic-header) {
     /* Left padding ensures content text doesn't overlap with the accent line */
     padding-left: 16px;
     padding-right: 12px;
@@ -33,6 +34,8 @@
 .semantic-block > ul,
 .semantic-block > ol {
     padding-left: 2.5em;
+    /* Reset margin to avoid double indentation effect if needed, but usually padding is enough */
+    margin-left: 1em; 
 }
 
 /* Left Accent Line */

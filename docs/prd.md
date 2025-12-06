@@ -44,15 +44,17 @@
         *   If match closing tag `</SameName>` -> depth--.
         *   Stop when depth == 0.
     4.  **Token Generation**:
-        *   Create `div_open` token with class `semantic-block` and attribute `data-tag="TagName"`.
+        *   Create `div_open` token with class `semantic-block`.
+        *   **Title Header**: Create a child `div` token with class `semantic-header` containing the tag name. This replaces the previous pseudo-element approach for better stability.
         *   **Recursion**: Call `state.md.block.tokenize(state, startLine + 1, endLine)` to parse the *inner* content as standard Markdown (supporting lists, bold, code, etc.).
         *   Create `div_close` token.
     5.  **Indentation Handling**: Ensure the parser respects the indentation of parent blocks (e.g., if used inside a list item).
 
 ### 2.4. Styling (`media/style.css`)
 *   **Theme Integration**: Use VS Code CSS variables (e.g., `var(--vscode-editor-background)`, `var(--vscode-panel-border)`).
-*   **Dynamic Headers**: Use `content: attr(data-tag)` in `::before` pseudo-element to display the tag name as the container title automatically.
+*   **Real DOM Headers**: Style `.semantic-header` directly instead of using `::before` pseudo-elements to prevent rendering issues (e.g., disappearance on hover).
 *   **Layout**: Card style with a left accent border.
+*   **List Indentation**: Explicitly set `margin-left: 1em` for `ul` and `ol` inside semantic blocks to prevent bullets from overlapping with the accent border.
 
 ---
 
@@ -79,9 +81,15 @@ function semanticBlock(state, startLine, endLine, silent) {
     //       if (depth === 0) found = true; break;
     //    }
     // 5. If found:
-    //    state.push('semantic_open', 'div', 1);
+    //    state.push('div_open', 'div', 1); // semantic-block
+    //    
+    //    // NEW: Render Title as Real DOM Element
+    //    state.push('div_open', 'div', 1); // semantic-header
+    //    state.push('inline', ...); // text content
+    //    state.push('div_close', 'div', -1);
+    //
     //    state.md.block.tokenize(state, startLine + 1, nextLine); // Recursive parsing
-    //    state.push('semantic_close', 'div', -1);
+    //    state.push('div_close', 'div', -1);
     //    state.line = nextLine + 1;
     //    return true;
 }
@@ -95,26 +103,34 @@ function semanticBlock(state, startLine, endLine, silent) {
     background-color: var(--vscode-editor-background);
     margin: 1em 0;
     position: relative;
-    overflow: hidden;
+    /* overflow: hidden removed to prevent clipping */
 }
 
-/* Dynamic Title Bar */
-.semantic-block::before {
-    content: attr(data-tag);
+/* Real DOM Title Bar */
+.semantic-header {
     display: block;
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-editor-foreground);
-    padding: 4px 10px;
+    padding: 4px 10px 4px 16px;
     font-weight: bold;
     font-size: 0.85em;
     text-transform: uppercase;
     border-bottom: 1px solid var(--vscode-panel-border);
-    opacity: 0.8;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
 }
 
 /* Content Padding */
-.semantic-block > *:not(::before) {
-    padding: 0 12px;
+.semantic-block > *:not(.semantic-header) {
+    padding-left: 16px;
+    padding-right: 12px;
+}
+
+/* List Indentation Fix */
+.semantic-block > ul,
+.semantic-block > ol {
+    padding-left: 2.5em;
+    margin-left: 1em;
 }
 
 /* Left Accent Line */
@@ -122,8 +138,9 @@ function semanticBlock(state, startLine, endLine, silent) {
     content: "";
     position: absolute;
     top: 0; bottom: 0; left: 0;
-    width: 3px;
+    width: 4px;
     background-color: var(--vscode-textLink-foreground);
+    z-index: 2;
 }
 ```
 
@@ -132,7 +149,7 @@ function semanticBlock(state, startLine, endLine, silent) {
 ## 4. Edge Cases & Requirements Checklist
 
 1.  **Nesting**: Code must handle `<group><group>content</group></group>` correctly using the depth counter.
-2.  **Attributes**: The Regex must allow attributes (e.g., `<user id="1">`), but the parser should use the tag name ("user") for the `data-tag` attribute.
+2.  **Attributes**: The Regex must allow attributes (e.g., `<user id="1">`), but the parser should use the tag name ("user") for the header text.
 3.  **Indentation**: The parser must detect the indentation of the opening tag and ensure the closing tag has matching indentation (visual block logic).
 4.  **Fault Tolerance**: If no closing tag is found, return `false` (let it be rendered as plain text/HTML), do NOT crash or hang.
 5.  **Performance**: Do not use Regex on the entire document string. Use line-by-line scanning via the `state` object.
