@@ -1,0 +1,26 @@
+{
+    "scopeName": "markdown.semantic.xml",
+    "injectionSelector": "L:text.html.markdown",
+    "patterns": [
+        {
+            "match": "(<)(/?)([a-zA-Z0-9-_]+)([^>]*)(>)",
+            "captures": {
+                "1": {
+                    "name": "punctuation.definition.tag.begin.xml"
+                },
+                "2": {
+                    "name": "punctuation.definition.tag.begin.xml"
+                },
+                "3": {
+                    "name": "entity.name.tag.xml"
+                },
+                "4": {
+                    "name": "meta.tag.attributes.xml"
+                },
+                "5": {
+                    "name": "punctuation.definition.tag.end.xml"
+                }
+            }
+        }
+    ]
+}

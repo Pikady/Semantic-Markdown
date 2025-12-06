@@ -1,22 +1,31 @@
 {
   "name": "semantic-markdown",
   "displayName": "Semantic Markdown",
-  "description": "增强 VS Code 对 Markdown 文档中“任意 XML 风格语义标签”的支持。",
+  "description": "Renders arbitrary XML-style tags as elegant containers in Markdown preview.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.106.1"
+    "vscode": "^1.70.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": [
+    "grammars": [
       {
-        "command": "semantic-markdown.helloWorld",
-        "title": "Hello World"
+        "scopeName": "markdown.semantic.xml",
+        "path": "./syntaxes/semantic.json",
+        "injectTo": [
+          "text.html.markdown"
+        ]
       }
+    ],
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/style.css"
     ]
   },
   "scripts": {

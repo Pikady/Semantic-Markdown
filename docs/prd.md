@@ -1,155 +1,167 @@
 
 ---
 
-# 项目需求文档：Semantic Markdown (VS Code  Extension)
+# 🚀 Prompt: VS Code Extension Generation Specification
 
-## 1. 项目概述
-
-**项目名称**：Semantic Markdown
-**核心目标**：增强 VS Code 对 Markdown 文档中“任意 XML 风格语义标签”的支持。
-**应用场景**：用户在编写产品文档或技术文档时，习惯使用自定义 XML 标签（如 `<user>`, `<warning>`, `<step>`）来包裹内容。
-**核心功能**：
-1.  **编辑器高亮**：在编辑区域对这些标签进行语法高亮。
-2.  **预览渲染**：在 Markdown 预览区将这些标签转换为优雅的 UI 容器（卡片），且**支持标签内部继续渲染 Markdown 语法**（如列表、粗体、代码块）。
-3.  **通用性**：不预设标签列表，支持用户输入的任意标签名（Dynamic Tagging）。
+**Role**: You are an expert VS Code Extension Developer and TypeScript Engineer.
+**Task**: Create a complete VS Code extension named **"Semantic Markdown"**.
+**Goal**: Allow users to write arbitrary XML-style tags (e.g., `<note>`, `<user>`, `<step>`) in Markdown files. These tags should be highlighted in the editor and rendered as elegant UI containers (cards) in the preview, while supporting standard Markdown content inside them.
 
 ---
 
-## 2. 技术架构与规范
+## 1. Project Overview
 
-*   **开发框架**：VS Code Extension API
-*   **Markdown 引擎**：`markdown-it` (VS Code 内置引擎)
-*   **核心解析策略**：使用 **Block Ruler (块级规则)** 而非简单的正则替换。这是为了保证性能、上下文感知（避免误伤代码块中的标签）以及支持嵌套 Markdown 渲染。
-*   **样式策略**：使用 CSS 变量 (`var(--vscode-...)`) 适配 VS Code 的亮色/暗色主题；使用 `attr(data-tag)` 实现动态标题。
+*   **Extension Name**: `semantic-markdown`
+*   **DisplayName**: Semantic Markdown
+*   **Description**: Renders arbitrary XML-style tags as elegant containers in Markdown preview.
+*   **Target Engine**: VS Code (`^1.70.0`)
+*   **Core Technology**: `markdown-it` (VS Code's built-in Markdown engine).
 
----
+## 2. Technical Architecture
 
-## 3. 详细实现步骤
+### 2.1. `package.json` Configuration
+*   **Activation**: `onLanguage:markdown`.
+*   **Contributes**:
+    *   `languages`: Markdown enhancement.
+    *   `grammars`: Inject into `text.html.markdown` to highlight `<Tag>` syntax.
+    *   `markdown.markdownItPlugins`: Register the renderer extension.
+    *   `markdown.previewStyles`: Register `./media/style.css`.
 
-### 步骤 1：配置文件 (`package.json`)
+### 2.2. Syntax Highlighting (`syntaxes/semantic.json`)
+*   **Pattern**: Match generic XML tags `<TagName>` and `</TagName>`.
+*   **Scope**: Use `entity.name.tag` so it inherits the user's color theme.
+*   **Constraints**: Do not hardcode tag names. It must match *any* tag name consisting of alphanumerics, hyphens, or underscores.
 
-需要在 `contributes` 中声明语言增强、语法注入和样式文件。
+### 2.3. Markdown-it Renderer (`src/extension.ts`)
+*   **Mechanism**: Implement a custom **Block Rule** using `md.block.ruler`.
+*   **Priority**: Insert rule *before* `html_block` to intercept these tags before standard HTML processing.
+*   **Parsing Logic**:
+    1.  **Trigger**: Detect lines starting with `<`.
+    2.  **Validation**: Match strictly block-level tags (must be on their own line).
+    3.  **Recursive Nesting (Crucial)**: Implement a **Depth Counter**.
+        *   Start depth = 1.
+        *   Scan forward. If match opening tag `<SameName>` -> depth++.
+        *   If match closing tag `</SameName>` -> depth--.
+        *   Stop when depth == 0.
+    4.  **Token Generation**:
+        *   Create `div_open` token with class `semantic-block` and attribute `data-tag="TagName"`.
+        *   **Recursion**: Call `state.md.block.tokenize(state, startLine + 1, endLine)` to parse the *inner* content as standard Markdown (supporting lists, bold, code, etc.).
+        *   Create `div_close` token.
+    5.  **Indentation Handling**: Ensure the parser respects the indentation of parent blocks (e.g., if used inside a list item).
 
-*   **Grammars**：注入到 `text.html.markdown` 作用域。
-*   **Markdown**：启用 `markdown.markdownItPlugins` 并配置样式。
-
-### 步骤 2：语法高亮 (`syntaxes/semantic-xml.json`)
-
-**目标**：让编辑器识别 `<Tag>` 和 `</Tag>`。
-**规则**：
-*   匹配 `<` + `标签名` + `>`。
-*   标签名允许字母、数字、下划线、中划线。
-*   不要限定具体标签名，匹配通用模式。
-*   Scope 建议使用 `entity.name.tag` 以获得默认主题颜色支持。
-
-### 步骤 3：核心渲染逻辑 (`src/extension.ts`)
-
-这是项目的核心。请编写一个 `markdown-it` 插件。
-
-**算法逻辑 (Block Rule)**：
-1.  **注册规则**：使用 `md.block.ruler.before('html_block', 'semantic_xml', ...)`，优先级高于普通 HTML 块。
-2.  **起始检查**：
-    *   检查当前行首字符是否为 `<` (性能优化)。
-    *   检查当前行是否匹配开始标签正则 `^<([a-zA-Z0-9-_]+)(\s.*?)?>$`。
-    *   如果匹配，提取 `tagName`。
-3.  **寻找闭合**：
-    *   从下一行开始循环，向下查找匹配的结束标签 `^</tagName>$`。
-    *   如果找不到闭合标签，返回 `false`（放弃处理，交给后续规则）。
-4.  **生成 Token**：
-    *   如果找到闭合，消耗掉这些行。
-    *   Push **Open Token**: `div`，带属性 `class="semantic-block"`, `data-tag="tagName"`。
-    *   **关键步骤**：调用 `state.md.block.tokenize(state, startLine + 1, nextLine)`。这步操作是**递归解析**，确保标签内部的内容（如列表、引用）被渲染为 HTML，而不是纯文本。
-    *   Push **Close Token**: `div`。
-5.  **返回**：`true`。
-
-### 步骤 4：样式设计 (`media/style.css`)
-
-**目标**：将 `<div class="semantic-block" data-tag="...">` 渲染为卡片。
-
-**CSS 规范**：
-*   **容器**：带边框、圆角、阴影。背景色使用 `var(--vscode-editor-background)`。
-*   **动态标题**：使用伪元素 `::before` 和 `content: attr(data-tag)`。
-    *   标题背景色：使用 `var(--vscode-sideBar-background)` 或类似浅色/深色适配色。
-    *   标题文字：转大写 (`text-transform: uppercase`)，加粗。
-*   **装饰**：左侧添加一条彩色竖线（例如使用 `var(--vscode-textLink-foreground)`）。
-*   **间距**：确保内部内容 (`.semantic-block > *`) 有合适的 padding。
+### 2.4. Styling (`media/style.css`)
+*   **Theme Integration**: Use VS Code CSS variables (e.g., `var(--vscode-editor-background)`, `var(--vscode-panel-border)`).
+*   **Dynamic Headers**: Use `content: attr(data-tag)` in `::before` pseudo-element to display the tag name as the container title automatically.
+*   **Layout**: Card style with a left accent border.
 
 ---
 
-## 4. 代码结构参考 (Prompt for AI)
+## 3. Implementation Details (Code Structure)
 
-请根据以上逻辑，生成完整的项目代码结构：
+Please generate the code following these specific requirements.
 
-### File: src/extension.ts (核心解析器)
+### File: `package.json`
+*   Define `scopeName` as `markdown.semantic.xml`.
+*   Inject grammar into `text.html.markdown`.
 
+### File: `src/extension.ts`
+*(Key Algorithm Requirement)*
 ```typescript
-import * as vscode from 'vscode';
-
-export function activate(context: vscode.ExtensionContext) {
-    return {
-        extendMarkdownIt(md: any) {
-            // 在这里实现 Block Ruler 逻辑
-            // 务必包含 state.md.block.tokenize 以支持内部 Markdown 渲染
-            // 务必进行上下文检查（如缩进检查）以避免破坏代码块
-            return md.use(semanticPlugin); 
-        }
-    };
-}
-
-function semanticPlugin(md: any) {
-    // 具体的 parser 实现...
+// Skeleton logic for the Block Rule
+function semanticBlock(state, startLine, endLine, silent) {
+    // 1. Check start char '<' (Optimization)
+    // 2. Regex match opening tag: /^<([a-zA-Z0-9-_]+)(\s.*?)?>$/
+    // 3. Loop lines to find matching closing tag </TagName>
+    // 4. Handle Nesting:
+    //    while (nextLine < endLine) {
+    //       if (line matches opening tag) depth++;
+    //       if (line matches closing tag) depth--;
+    //       if (depth === 0) found = true; break;
+    //    }
+    // 5. If found:
+    //    state.push('semantic_open', 'div', 1);
+    //    state.md.block.tokenize(state, startLine + 1, nextLine); // Recursive parsing
+    //    state.push('semantic_close', 'div', -1);
+    //    state.line = nextLine + 1;
+    //    return true;
 }
 ```
 
-### File: media/style.css (样式)
-
+### File: `media/style.css`
 ```css
 .semantic-block {
-    /* 容器样式 */
-    position: relative;
     border: 1px solid var(--vscode-panel-border);
     border-radius: 4px;
+    background-color: var(--vscode-editor-background);
     margin: 1em 0;
+    position: relative;
+    overflow: hidden;
 }
 
+/* Dynamic Title Bar */
 .semantic-block::before {
-    /* 动态标题栏 */
     content: attr(data-tag);
     display: block;
+    background-color: var(--vscode-sideBar-background);
+    color: var(--vscode-editor-foreground);
+    padding: 4px 10px;
     font-weight: bold;
+    font-size: 0.85em;
     text-transform: uppercase;
-    /* ...其他样式 */
+    border-bottom: 1px solid var(--vscode-panel-border);
+    opacity: 0.8;
+}
+
+/* Content Padding */
+.semantic-block > *:not(::before) {
+    padding: 0 12px;
+}
+
+/* Left Accent Line */
+.semantic-block::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 3px;
+    background-color: var(--vscode-textLink-foreground);
 }
 ```
 
 ---
 
-## 5. 测试用例 (用于验证)
+## 4. Edge Cases & Requirements Checklist
 
-生成的插件应能完美处理以下 Markdown 内容：
+1.  **Nesting**: Code must handle `<group><group>content</group></group>` correctly using the depth counter.
+2.  **Attributes**: The Regex must allow attributes (e.g., `<user id="1">`), but the parser should use the tag name ("user") for the `data-tag` attribute.
+3.  **Indentation**: The parser must detect the indentation of the opening tag and ensure the closing tag has matching indentation (visual block logic).
+4.  **Fault Tolerance**: If no closing tag is found, return `false` (let it be rendered as plain text/HTML), do NOT crash or hang.
+5.  **Performance**: Do not use Regex on the entire document string. Use line-by-line scanning via the `state` object.
+
+---
+
+## 5. Test Examples
+
+The generated code must correctly render this Markdown:
 
 ```markdown
-# 测试文档
-
-普通文本...
+# Demo
 
 <user>
-- **Name**: John Doe
+- **Name**: Alice
 - **Role**: Admin
 </user>
 
-<warning>
-> 这是一个警告块。
-> 内部包含引用语法。
-</warning>
+<group>
+  Outer content
+  <group>
+     Inner content (Nested)
+  </group>
+</group>
 
+- List Item:
+  <note>
+  Indented block inside a list.
+  </note>
 ```
 
-**预期结果**：
-1.  `<user>` 和 `<warning>` 在编辑器中变色高亮。
-2.  在预览中，`<user>` 显示为带有 "USER" 标题的卡片，内部的列表项正常渲染（黑点、粗体）。
-3.  `<warning>` 显示为带有 "WARNING" 标题的卡片，内部显示为引用样式。
-
----
-
-**指令结束**：请依据此文档生成完整的 VS Code 插件项目代码。
+**Action**: Please generate the complete project file structure and code based on these specifications.
