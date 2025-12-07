@@ -18,7 +18,7 @@
       {
         "command": "semantic-markdown.onEnter",
         "key": "enter",
-        "when": "editorTextFocus && editorLangId == markdown && !suggestionWidgetVisible && !inSnippetMode"
+        "when": "editorTextFocus && editorLangId == markdown && !suggestionWidgetVisible && !inSnippetMode && semantic-markdown:betweenTags"
       }
     ],
     "languages": [

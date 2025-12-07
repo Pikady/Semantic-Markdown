@@ -10,6 +10,42 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(autoCloseDisposable);
 
+    // Context Key Logic
+    const updateContext = () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'markdown') {
+            vscode.commands.executeCommand('setContext', 'semantic-markdown:betweenTags', false);
+            return;
+        }
+
+        const selection = editor.selection;
+        if (!selection.isEmpty) {
+            vscode.commands.executeCommand('setContext', 'semantic-markdown:betweenTags', false);
+            return;
+        }
+
+        const position = selection.active;
+        const lineText = editor.document.lineAt(position.line).text;
+        const textBefore = lineText.substring(0, position.character);
+        const textAfter = lineText.substring(position.character);
+
+        const beforeMatch = textBefore.match(/<([a-zA-Z0-9-_]+)(?:\s+[^>]*)?>$/);
+        const afterMatch = textAfter.match(/^<\/([a-zA-Z0-9-_]+)>/);
+
+        const isBetweenTags = !!(beforeMatch && afterMatch && beforeMatch[1] === afterMatch[1]);
+        vscode.commands.executeCommand('setContext', 'semantic-markdown:betweenTags', isBetweenTags);
+    };
+
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection(updateContext),
+        vscode.window.onDidChangeActiveTextEditor(updateContext),
+        vscode.workspace.onDidChangeTextDocument(e => {
+            if (vscode.window.activeTextEditor && e.document === vscode.window.activeTextEditor.document) {
+                updateContext();
+            }
+        })
+    );
+
     // Register Enter Key Command
     const onEnterDisposable = vscode.commands.registerCommand('semantic-markdown.onEnter', () => {
         onEnterKey();
@@ -111,10 +147,8 @@ function onEnterKey() {
         // Insert: \n + cursor + \n
         // And importantly: NO indentation logic here, just raw newlines
         editor.insertSnippet(new vscode.SnippetString('\n$0\n'));
-    } else {
-        // Fallback to standard Enter behavior
-        vscode.commands.executeCommand('type', { source: 'keyboard', text: '\n' });
     }
+    // Fallback is NOT needed because the command is only enabled via context key when the condition is true.
 }
 
 function semanticBlock(state: any, startLine: number, endLine: number, silent: boolean): boolean {
