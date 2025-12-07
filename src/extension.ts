@@ -2,6 +2,20 @@ import * as vscode from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Semantic Markdown is active');
+
+    // Register Auto Close Tag listener
+    const autoCloseDisposable = vscode.workspace.onDidChangeTextDocument(event => {
+        insertAutoCloseTag(event);
+    });
+
+    context.subscriptions.push(autoCloseDisposable);
+
+    // Register Enter Key Command
+    const onEnterDisposable = vscode.commands.registerCommand('semantic-markdown.onEnter', () => {
+        onEnterKey();
+    });
+    context.subscriptions.push(onEnterDisposable);
+
     return {
         extendMarkdownIt(md: any) {
             md.block.ruler.before('html_block', 'semantic_block', (state: any, startLine: number, endLine: number, silent: boolean) => {
@@ -10,6 +24,97 @@ export function activate(context: vscode.ExtensionContext) {
             return md;
         }
     };
+}
+
+// Auto Close Tag Logic
+function insertAutoCloseTag(event: vscode.TextDocumentChangeEvent): void {
+    if (event.contentChanges.length === 0) { return; }
+    const textChange = event.contentChanges[0];
+    if (textChange.text !== '>') { return; }
+
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) { return; }
+
+    const document = editor.document;
+    if (document.languageId !== 'markdown') { return; }
+
+    // Use the change range to determine the position, not the current selection
+    // (Selection might not be updated yet)
+    const range = textChange.range;
+    const position = range.start.translate(0, 1); // The position after the inserted '>'
+    const lineText = document.lineAt(position.line).text;
+    const textBeforeCursor = lineText.substring(0, position.character);
+
+    // The document is already updated, so textBeforeCursor ends with '>'
+    if (!textBeforeCursor.endsWith('>')) { return; }
+
+    // Strip the last '>' to analyze the tag content
+    const textContent = textBeforeCursor.slice(0, -1);
+
+    // Ignore self-closing tags (e.g. <br/>)
+    if (textContent.endsWith('/')) { return; }
+
+    // Regex to match opening tag, allowing attributes: <TagName ...
+    const tagMatch = textContent.match(/<([a-zA-Z0-9-_]+)(?:\s+[^>]*)?$/);
+
+    if (tagMatch) {
+        const tagName = tagMatch[1];
+        
+        // Check if it's a self-closing tag or already closed immediately
+        const textAfterCursor = lineText.substring(position.character);
+        if (textAfterCursor.startsWith(`</${tagName}>`)) {
+            return;
+        }
+
+        // Avoid double closing if user is just typing inside an existing tag
+        // Simple check: do we see a closing > right before? We just typed it.
+        
+        editor.insertSnippet(
+            new vscode.SnippetString(`$0</${tagName}>`),
+            new vscode.Selection(position, position)
+        );
+    }
+}
+
+// On Enter Key Logic
+function onEnterKey() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.commands.executeCommand('type', { source: 'keyboard', text: '\n' });
+        return;
+    }
+
+    const selection = editor.selection;
+    // Only handle if single cursor and selection is empty
+    if (!selection.isEmpty) {
+        vscode.commands.executeCommand('type', { source: 'keyboard', text: '\n' });
+        return;
+    }
+
+    const document = editor.document;
+    const position = selection.active;
+    const lineText = document.lineAt(position.line).text;
+    
+    const textBefore = lineText.substring(0, position.character);
+    const textAfter = lineText.substring(position.character);
+
+    // Check pattern: <Tag ...> | </Tag>
+    // 1. Before: Ends with <TagName ...>
+    // 2. After: Starts with </TagName>
+    // Note: We need to extract TagName from both sides to ensure they match
+    
+    const beforeMatch = textBefore.match(/<([a-zA-Z0-9-_]+)(?:\s+[^>]*)?>$/);
+    const afterMatch = textAfter.match(/^<\/([a-zA-Z0-9-_]+)>/);
+
+    if (beforeMatch && afterMatch && beforeMatch[1] === afterMatch[1]) {
+        // We are between matching tags!
+        // Insert: \n + cursor + \n
+        // And importantly: NO indentation logic here, just raw newlines
+        editor.insertSnippet(new vscode.SnippetString('\n$0\n'));
+    } else {
+        // Fallback to standard Enter behavior
+        vscode.commands.executeCommand('type', { source: 'keyboard', text: '\n' });
+    }
 }
 
 function semanticBlock(state: any, startLine: number, endLine: number, silent: boolean): boolean {

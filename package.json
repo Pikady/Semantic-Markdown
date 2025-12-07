@@ -14,6 +14,19 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "keybindings": [
+      {
+        "command": "semantic-markdown.onEnter",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == markdown && !suggestionWidgetVisible && !inSnippetMode"
+      }
+    ],
+    "languages": [
+      {
+        "id": "markdown",
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "grammars": [
       {
         "scopeName": "markdown.semantic.xml",

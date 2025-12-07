@@ -1,6 +1,3 @@
-
----
-
 # 🚀 Prompt: VS Code Extension Generation Specification
 
 **Role**: You are an expert VS Code Extension Developer and TypeScript Engineer.
@@ -22,10 +19,11 @@
 ### 2.1. `package.json` Configuration
 *   **Activation**: `onLanguage:markdown`.
 *   **Contributes**:
-    *   `languages`: Markdown enhancement.
+    *   `languages`: Markdown enhancement (configuration via `language-configuration.json`).
     *   `grammars`: Inject into `text.html.markdown` to highlight `<Tag>` syntax.
     *   `markdown.markdownItPlugins`: Register the renderer extension.
     *   `markdown.previewStyles`: Register `./media/style.css`.
+    *   `keybindings`: Bind `Enter` key to custom command for smart newline handling.
 
 ### 2.2. Syntax Highlighting (`syntaxes/semantic.json`)
 *   **Pattern**: Match generic XML tags `<TagName>` and `</TagName>`.
@@ -55,6 +53,31 @@
 *   **Real DOM Headers**: Style `.semantic-header` directly instead of using `::before` pseudo-elements to prevent rendering issues (e.g., disappearance on hover).
 *   **Layout**: Card style with a left accent border.
 *   **List Indentation**: Explicitly set `margin-left: 1em` for `ul` and `ol` inside semantic blocks to prevent bullets from overlapping with the accent border.
+
+### 2.5. Auto-Completion & Editing Experience (New Feature)
+
+#### 2.5.1 Auto-Close Tags
+*   **Mechanism**: Listen to `onDidChangeTextDocument` events.
+*   **Trigger**: When user types `>`, check if it closes an opening tag.
+*   **Logic**:
+    1.  Detect input of `>`.
+    2.  Extract text before cursor to identify `<TagName`.
+    3.  Verify it's not a self-closing tag (e.g., `<br/>`).
+    4.  Verify it's not already closed immediately after.
+    5.  **Action**: Automatically insert `</TagName>` and place cursor between tags: `<Tag>|</Tag>`.
+*   **Configuration**:
+    *   In `language-configuration.json`, **disable** native auto-closing for `<` and `>` to prevent conflict with our custom logic.
+
+#### 2.5.2 Smart Enter Key
+*   **Goal**: When pressing `Enter` between `<Tag>| </Tag>`, insert a new line **without** indentation.
+*   **Implementation**:
+    *   Register custom command `semantic-markdown.onEnter`.
+    *   Bind `Enter` key in `package.json` with strict `when` clause (`editorTextFocus && editorLangId == markdown && !suggestionWidgetVisible && !inSnippetMode`).
+*   **Logic**:
+    1.  Check if cursor is strictly between `<TagName...>` and `</TagName>`.
+    2.  If true, insert `\n\n` and place cursor on the empty middle line.
+    3.  **Crucial**: Do NOT apply indentation (unlike HTML defaults).
+    4.  If false, fallback to standard `type` command for newline.
 
 ---
 
