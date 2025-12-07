@@ -45,12 +45,37 @@
     margin-left: 1em; 
 }
 
-/* Left Accent Line */
+/* Left Accent Line - Default (Level 1) */
 .semantic-block::after {
     content: "";
     position: absolute;
     top: 0; bottom: 0; left: 0;
     width: 4px;
-    background-color: var(--vscode-textLink-foreground);
+    background-color: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
     z-index: 2;
+}
+
+/* Level 2 */
+.semantic-block .semantic-block::after {
+    background-color: var(--vscode-charts-green, #388a34);
+}
+
+/* Level 3 */
+.semantic-block .semantic-block .semantic-block::after {
+    background-color: var(--vscode-charts-yellow, #bf8803);
+}
+
+/* Level 4 */
+.semantic-block .semantic-block .semantic-block .semantic-block::after {
+    background-color: var(--vscode-charts-orange, #d15700);
+}
+
+/* Level 5 */
+.semantic-block .semantic-block .semantic-block .semantic-block .semantic-block::after {
+    background-color: var(--vscode-charts-red, #e51400);
+}
+
+/* Level 6 */
+.semantic-block .semantic-block .semantic-block .semantic-block .semantic-block .semantic-block::after {
+    background-color: var(--vscode-charts-purple, #652d90);
 }
