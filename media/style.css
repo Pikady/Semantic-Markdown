@@ -30,6 +30,13 @@
     padding-right: 12px;
 }
 
+/* Fix for nested blocks: Indent them and reset padding to prevent layout issues */
+.semantic-block > .semantic-block {
+    margin-left: 16px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
 /* Fix: Increase padding for lists to prevent bullets from being hidden behind the accent line */
 .semantic-block > ul,
 .semantic-block > ol {

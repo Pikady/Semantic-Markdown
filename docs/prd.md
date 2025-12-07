@@ -67,6 +67,7 @@
     5.  **Action**: Automatically insert `</TagName>` and place cursor between tags: `<Tag>|</Tag>`.
 *   **Configuration**:
     *   In `language-configuration.json`, **disable** native auto-closing for `<` and `>` to prevent conflict with our custom logic.
+    *   **Remove** backtick (`` ` ``) from auto-closing pairs to ensure triple-backtick code blocks work correctly.
 
 #### 2.5.2 Smart Enter Key
 *   **Goal**: When pressing `Enter` between `<Tag>| </Tag>`, insert a new line **without** indentation.
@@ -154,6 +155,13 @@ function semanticBlock(state, startLine, endLine, silent) {
 .semantic-block > ol {
     padding-left: 2.5em;
     margin-left: 1em;
+}
+
+/* Nested Block Indentation Fix */
+.semantic-block > .semantic-block {
+    margin-left: 16px;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* Left Accent Line */
